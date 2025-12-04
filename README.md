@@ -158,7 +158,39 @@ Key environment variables:
 
 See `config.py` for all options.
 
-## 🐳 Docker
+## ☁️ Deployment
+
+### Render (FREE)
+
+The bot is now a Flask web service ready for free deployment!
+
+**Quick Deploy:**
+```bash
+# 1. Update .env with credentials
+# 2. Push to GitHub
+git push
+
+# 3. On Render.com:
+# - Create Web Service
+# - Build: pip install -r requirements.txt
+# - Start: gunicorn --worker-class gevent --workers 1 main:app
+# - Add environment variables
+
+# 4. Set webhook
+python setup_webhook.py
+
+# 5. Keep alive with UptimeRobot
+# - Monitor: /health endpoint
+# - Interval: 5 minutes
+```
+
+**Cost:** FREE (Render free tier + UptimeRobot free tier)
+
+**Full Deployment Guide:** See [`RENDER_DEPLOYMENT_GUIDE.md`](RENDER_DEPLOYMENT_GUIDE.md)
+
+**Deployment Checklist:** See [`RENDER_DEPLOYMENT_CHECKLIST.md`](RENDER_DEPLOYMENT_CHECKLIST.md)
+
+### Docker
 
 ```bash
 docker build -t terabox-bot .
