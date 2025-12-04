@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: terabox-bot
+    runtime: python
+    pythonVersion: 3.11
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class gevent --workers 1 main:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      # Add these via Render dashboard environment variables:
+      # BOT_TOKEN
+      # API_ID
+      # API_HASH
+      # STORE_CHANNEL
+      # ERROR_CHANNEL
+      # LOG_CHANNEL
+      # MONGODB_URI

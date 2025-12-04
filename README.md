@@ -2,7 +2,10 @@
 
 A **production-ready**, fully asynchronous Telegram bot for downloading files from TeraBox with support for bulk processing, metadata extraction, and automatic storage management.
 
+**Now available as a FREE web service** - Deploy on Render + UptimeRobot with $0/month cost!
+
 ![Python](https://img.shields.io/badge/Python-3.9+-blue?style=flat-square)
+![Flask](https://img.shields.io/badge/Flask-3.0+-green?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Production--Ready-brightgreen?style=flat-square)
 
 ## ✨ Features
@@ -21,10 +24,41 @@ A **production-ready**, fully asynchronous Telegram bot for downloading files fr
 - 🛡️ **Error Handling** - Comprehensive error logging
 - 🔄 **Async Operations** - Fully non-blocking
 - 🐳 **Docker Support** - Production-ready Docker image
+- 🌐 **Web Service Ready** - Webhook-based, deployable to Render
+
+## 🚀 Quick Deploy
+
+**Deploy for FREE on Render with UptimeRobot monitoring:**
+
+```bash
+# 1. Push to GitHub
+git push
+
+# 2. Deploy on Render.com
+# - Create Web Service → Connect GitHub repo
+# - Build: pip install -r requirements.txt
+# - Start: gunicorn --worker-class gevent --workers 1 main:app
+# - Add environment variables from .env.example
+
+# 3. Update Telegram webhook
+curl -X POST "https://api.telegram.org/botBOT_TOKEN/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://your-render-url.onrender.com/webhook"}'
+
+# 4. Set up UptimeRobot
+# - Monitor: https://your-render-url.onrender.com/health
+# - Interval: 5 minutes
+```
+
+**Total Cost:** $0/month (Render free tier + UptimeRobot free)
+
+📖 **[Full Deployment Guide →](RENDER_DEPLOYMENT.md)**
 
 ## 🏗️ Architecture
 
 **Key Design:**
+- **Webhook-based** - Receives updates from Telegram via HTTP POST
+- **Web Service** - Runs on Flask with Gunicorn
 - **Single Unified Handler** in `plugins/handler.py` processes ALL link types
 - **No Circular Imports** - Clean plugin + helpers separation
 - **Fully Async** - All I/O non-blocking
@@ -33,11 +67,14 @@ A **production-ready**, fully asynchronous Telegram bot for downloading files fr
 ### Project Structure
 ```
 project/
-├── main.py                    # Bot entry point
+├── main.py                    # Flask web service
+├── wsgi.py                    # WSGI entry point
 ├── config.py                  # Configuration
 ├── requirements.txt           # Dependencies
+├── render.yaml                # Render deployment config
 ├── Dockerfile                 # Production image
 ├── README.md                  # This file
+├── RENDER_DEPLOYMENT.md       # Deployment guide
 ├── helpers/                   # Reusable async modules
 │   ├── api_client.py         # TeraBox API resolver
 │   ├── downloader.py         # Async file downloader

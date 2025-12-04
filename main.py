@@ -1,15 +1,17 @@
 """
-TeraBox Downloader Bot - Main Entry Point
+TeraBox Downloader Bot - Flask Webhook Service
 Telegram bot for downloading files from TeraBox
+Uses Flask to receive webhook updates from Telegram
 """
 
 import asyncio
-import signal
+import os
 import sys
 from pathlib import Path
 
+from flask import Flask, request, jsonify
 from telegram import Update
-from telegram.ext import Application, CallbackContext
+from telegram.ext import Application
 
 from helpers.logger import get_logger
 from helpers.db import db
@@ -21,16 +23,20 @@ from plugins.handler import setup_message_handlers
 
 logger = get_logger("terabox_bot")
 
+# Flask app
+app = Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
+
 
 class TeraBoxBot:
-    """Main bot class"""
+    """TeraBox bot with webhook support"""
 
     def __init__(self):
-        self.app = None
+        self.tg_app = None
         self.running = False
 
-    async def start(self):
-        """Start the bot"""
+    async def initialize(self):
+        """Initialize bot components"""
         try:
             logger.info("=" * 50)
             logger.info("🚀 TeraBox Downloader Bot Starting...")
@@ -58,43 +64,58 @@ class TeraBoxBot:
 
             # Create telegram bot application
             logger.info("🤖 Creating Telegram bot...")
-            self.app = Application.builder().token(BOT_TOKEN).build()
+            self.tg_app = Application.builder().token(BOT_TOKEN).build()
 
             # Setup handlers
             logger.info("📝 Setting up handlers...")
-            setup_start_handlers(self.app)
-            setup_message_handlers(self.app)
+            setup_start_handlers(self.tg_app)
+            setup_message_handlers(self.tg_app)
+
+            # Initialize application
+            await self.tg_app.initialize()
+            await self.tg_app.start()
 
             self.running = True
 
-            # Initialize and start the application
-            logger.info("✅ Starting bot polling...")
-            await self.app.initialize()
-            await self.app.start()
-            await self.app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-
             logger.info("=" * 50)
-            logger.info("🎉 Bot started successfully!")
+            logger.info("🎉 Bot initialized successfully!")
             logger.info("=" * 50)
-
-            # Keep running
-            await asyncio.Event().wait()
 
         except Exception as e:
-            logger.error(f"❌ Failed to start bot: {e}", exc_info=True)
-            await self.stop()
-            sys.exit(1)
+            logger.error(f"❌ Failed to initialize bot: {e}", exc_info=True)
+            raise
 
-    async def stop(self):
-        """Stop the bot gracefully"""
+    async def process_update(self, update_data: dict) -> bool:
+        """Process a Telegram update from webhook"""
+        try:
+            if not self.tg_app or not self.running:
+                logger.warning("Bot not initialized")
+                return False
+
+            # Convert dict to Update object
+            update = Update.de_json(update_data, self.tg_app.bot)
+            if not update:
+                logger.warning("Invalid update received")
+                return False
+
+            # Process the update
+            await self.tg_app.process_update(update)
+            return True
+
+        except Exception as e:
+            logger.error(f"Error processing update: {e}", exc_info=True)
+            return False
+
+    async def shutdown(self):
+        """Shutdown bot gracefully"""
         logger.info("🛑 Shutting down bot...")
         self.running = False
 
         try:
             # Stop application
-            if self.app:
-                await self.app.stop()
-                await self.app.shutdown()
+            if self.tg_app:
+                await self.tg_app.stop()
+                await self.tg_app.shutdown()
                 logger.info("✅ Bot stopped")
 
             # Close API client
@@ -110,52 +131,117 @@ class TeraBoxBot:
             logger.info("✅ Database disconnected")
 
             logger.info("=" * 50)
-            logger.info("✅ Bot stopped successfully")
+            logger.info("✅ Bot shutdown successfully")
             logger.info("=" * 50)
 
         except Exception as e:
             logger.error(f"Error during shutdown: {e}", exc_info=True)
 
-    async def _idle(self):
-        """Keep bot running until interrupted"""
-        try:
-            await asyncio.Event().wait()
-        except KeyboardInterrupt:
-            logger.info("Received interrupt signal")
-        except Exception as e:
-            logger.error(f"Unexpected error in idle loop: {e}")
+
+# Global bot instance
+bot_instance = None
 
 
-def signal_handler(signum, frame):
-    """Handle system signals"""
-    logger.info(f"Received signal {signum}")
+async def get_bot():
+    """Get or create bot instance"""
+    global bot_instance
+    if bot_instance is None:
+        bot_instance = TeraBoxBot()
+        await bot_instance.initialize()
+    return bot_instance
 
 
-async def main():
-    """Main entry point"""
-    bot = TeraBoxBot()
+# ==================== Flask Routes ====================
 
-    # Setup signal handlers
-    signal.signal(signal.SIGINT, lambda s, f: None)
-    signal.signal(signal.SIGTERM, lambda s, f: None)
-
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint for UptimeRobot"""
     try:
-        await bot.start()
-    except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received")
-        await bot.stop()
+        if bot_instance is None or not bot_instance.running:
+            return jsonify({"status": "initializing"}), 202
+        return jsonify({"status": "ok", "service": "terabox-bot"}), 200
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
-        await bot.stop()
-        sys.exit(1)
+        logger.error(f"Health check error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    """Telegram webhook endpoint"""
+    try:
+        # Get the bot instance
+        bot = await get_bot()
+
+        # Get the update data
+        update_data = request.get_json()
+        if not update_data:
+            logger.warning("Empty webhook payload")
+            return jsonify({"ok": False, "error": "Empty payload"}), 400
+
+        # Process the update
+        success = await bot.process_update(update_data)
+
+        if success:
+            return jsonify({"ok": True}), 200
+        else:
+            return jsonify({"ok": False}), 400
+
+    except Exception as e:
+        logger.error(f"Webhook error: {e}", exc_info=True)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint"""
+    return jsonify({
+        "name": "TeraBox Downloader Bot",
+        "status": "running" if bot_instance and bot_instance.running else "starting",
+        "endpoints": {
+            "webhook": "/webhook (POST)",
+            "health": "/health (GET)"
+        }
+    }), 200
+
+
+@app.errorhandler(404)
+def not_found(e):
+    """Handle 404 errors"""
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.errorhandler(500)
+def server_error(e):
+    """Handle 500 errors"""
+    logger.error(f"Server error: {e}")
+    return jsonify({"error": "Internal server error"}), 500
+
+
+async def init_bot():
+    """Initialize bot on startup"""
+    try:
+        await get_bot()
+    except Exception as e:
+        logger.error(f"Failed to initialize bot on startup: {e}")
+        raise
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        # Get port from environment or default to 5000
+        port = int(os.getenv("PORT", 5000))
+        host = os.getenv("HOST", "0.0.0.0")
+        debug = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+
+        # Initialize bot before starting Flask
+        asyncio.run(init_bot())
+
+        logger.info(f"🚀 Starting Flask server on {host}:{port}")
+        app.run(host=host, port=port, debug=debug)
+
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"Fatal error in main: {e}", exc_info=True)
+        logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
