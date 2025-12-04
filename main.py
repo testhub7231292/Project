@@ -87,10 +87,9 @@ class TeraBoxBot:
             setup_start_handlers(self.tg_app)
             setup_message_handlers(self.tg_app)
 
-            # Initialize application (webhook mode - do NOT call start())
+            # Initialize application
             await self.tg_app.initialize()
-            # Note: We do NOT call await self.tg_app.start() 
-            # because we're using webhooks, not polling
+            await self.tg_app.start()
 
             self.running = True
 

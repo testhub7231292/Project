@@ -8,6 +8,8 @@ A **production-ready**, fully asynchronous Telegram bot for downloading files fr
 ![Flask](https://img.shields.io/badge/Flask-3.0+-green?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Production--Ready-brightgreen?style=flat-square)
 
+> ⚠️ **If bot is not responding after deployment**, see [WEBHOOK_SETUP_REQUIRED.md](WEBHOOK_SETUP_REQUIRED.md) - 2 minute fix!
+
 ## ✨ Features
 
 ### Core Features
@@ -158,39 +160,7 @@ Key environment variables:
 
 See `config.py` for all options.
 
-## ☁️ Deployment
-
-### Render (FREE)
-
-The bot is now a Flask web service ready for free deployment!
-
-**Quick Deploy:**
-```bash
-# 1. Update .env with credentials
-# 2. Push to GitHub
-git push
-
-# 3. On Render.com:
-# - Create Web Service
-# - Build: pip install -r requirements.txt
-# - Start: gunicorn --worker-class gevent --workers 1 main:app
-# - Add environment variables
-
-# 4. Set webhook
-python setup_webhook.py
-
-# 5. Keep alive with UptimeRobot
-# - Monitor: /health endpoint
-# - Interval: 5 minutes
-```
-
-**Cost:** FREE (Render free tier + UptimeRobot free tier)
-
-**Full Deployment Guide:** See [`RENDER_DEPLOYMENT_GUIDE.md`](RENDER_DEPLOYMENT_GUIDE.md)
-
-**Deployment Checklist:** See [`RENDER_DEPLOYMENT_CHECKLIST.md`](RENDER_DEPLOYMENT_CHECKLIST.md)
-
-### Docker
+## 🐳 Docker
 
 ```bash
 docker build -t terabox-bot .
