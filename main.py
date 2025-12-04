@@ -8,6 +8,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from functools import wraps
 
 from flask import Flask, request, jsonify
 from telegram import Update
@@ -26,6 +27,21 @@ logger = get_logger("terabox_bot")
 # Flask app
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
+
+# Global event loop for async handlers
+loop = None
+
+
+def async_route(f):
+    """Decorator to handle async routes in Flask"""
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        global loop
+        if loop is None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return loop.run_until_complete(f(*args, **kwargs))
+    return wrapped
 
 
 class TeraBoxBot:
@@ -71,9 +87,10 @@ class TeraBoxBot:
             setup_start_handlers(self.tg_app)
             setup_message_handlers(self.tg_app)
 
-            # Initialize application
+            # Initialize application (webhook mode - do NOT call start())
             await self.tg_app.initialize()
-            await self.tg_app.start()
+            # Note: We do NOT call await self.tg_app.start() 
+            # because we're using webhooks, not polling
 
             self.running = True
 
@@ -166,6 +183,7 @@ def health():
 
 
 @app.route('/webhook', methods=['POST'])
+@async_route
 async def webhook():
     """Telegram webhook endpoint"""
     try:
