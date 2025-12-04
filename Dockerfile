@@ -62,4 +62,4 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import asyncio; asyncio.run(__import__('helpers.api_client', fromlist=['api_client']).api_client.init_session())" || exit 1
 
 # Run bot
-CMD ["python", "-u", "quick_webhook_setup.py"]
+CMD ["python", "-u", "main.py"]
